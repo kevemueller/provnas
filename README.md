@@ -2,17 +2,23 @@
 Ansible provisionsing of jails in a freenas environment
 
 This project aims at creating ansible glue for freenas servers as well as ready-to-use roles for most common jails that are not in the list of plugins.
+The glue is in draft stage ("works for me") and will be generalized if there is interest in use.
 
-Features
-========
-Ansible modules
-* freenas_jail to create, destroy, start, stop, restart jails via the freenas API
-* freenas_mountpoint to create, delete mountpoint assignments of a jail via the freenas API
+## Features
+### Ansible modules
+Modules use freenas API
+* freenas_jail
+  * create, destroy, start, stop, restart jails
+* freenas_mountpoint 
+  * create, delete mountpoint assignments of a jail
+### Roles
+* musicbrainz
+  * setup a musicbrainz server
+  * download, configure, download dump, import dump
+* proxy
+  * setup and configure squid
+## Installation
 
-Roles
-* musicbrainz to setup, configure, download dump of a musicbrainz server
-* proxy to setup, configure squid
+## Usage
 
-Usage
-=====
- 
+
