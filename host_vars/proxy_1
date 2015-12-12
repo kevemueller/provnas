@@ -1,0 +1,11 @@
+# this file is part of provnas
+# Copyright (c) 2015, Keve Mueller
+# All rights reserved.
+# see LICENSE for details
+
+# provide a separate out of jail datastore for the proxy cache
+jail_mounts:
+  - { src: 'zhome02/cache/proxy_1', dst: '/var/cache/proxy' }
+
+# set squid to cache here
+squid_cachedir: /var/cache/proxy/squid

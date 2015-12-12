@@ -1,0 +1,21 @@
+# this file is part of provnas
+# Copyright (c) 2015, Keve Mueller
+# All rights reserved.
+# see LICENSE for details
+
+- file: path=/tmp/mblatest state=directory
+
+- name: copy
+  copy: src="{{mbcopy}}/{{mblatest}}/{{item}}" dest=/tmp/mblatest/{{item}} force=no
+  with_items: mbdump
+  when: mbcopy is defined
+
+- name: fetch
+  get_url: url="http://ftp.musicbrainz.org/pub/musicbrainz/data/fullexport/{{mblatest}}/{{item}}" dest="/tmp/mblatest/{{item}}"
+  with_items: mbdump
+
+#TODO: checksum
+#TODO: gpg key
+
+- name: import db
+  shell: chdir={{mb_dest}} admin/InitDb.pl --createdb --import /tmp/mblatest/mbdump*.tar.bz2 --echo

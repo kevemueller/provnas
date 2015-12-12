@@ -1,0 +1,24 @@
+# this file is part of provnas
+# Copyright (c) 2015, Keve Mueller
+# All rights reserved.
+# see LICENSE for details
+
+
+# the freenas host
+freenas_host: localhost
+# the root password for the freenas host
+freenas_password: rootpassword
+
+# proxy environment variables
+proxy_env:
+   http_proxy: http://proxy_1.lan:3128
+   https_proxy: http://proxy_1.lan:3128
+   HTTP_PROXY: http://proxy_1.lan:3128
+   HTTPS_PROXY: http://proxy_1.lan:3128
+
+# override the value of the latest MusicBrainz dump
+mblatest: "20151209-005523"
+# provide a location for previously downloaded MusicBrainz dump directory local to the Ansible running host
+mbcopy: "/somewhere/localto/ansible/ftp.musicbrainz.org/pub/musicbrainz/data/fullexport"
+# list of dump items to import, mbdump_full for all dump files, mbdump_minimal for a minimal set, unspecified for no import
+mbdump: "{{mbdump_full}}"

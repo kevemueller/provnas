@@ -1,0 +1,44 @@
+# this file is part of provnas
+# Copyright (c) 2015, Keve Mueller
+# All rights reserved.
+# see LICENSE for details
+
+- name: install squid
+  pkgng: name=squid state=present
+
+- name: config squid
+  lineinfile:
+    dest: /usr/local/etc/squid/squid.conf
+    backup: yes
+    insertafter: "#cache_dir.*"
+    line: "cache_dir ufs {{squid_cachedir}} {{squid_cachesize}} 16 256"
+  when: squid_cachedir is defined
+  notify: squid_restart
+# CHECKME: diskd is recommended for BSD, but it throws
+# storeDiskdInit: msgget: (78) Function not implemented
+
+# match against download urls for specific packages - their content never changes for the same url, so we cache aggressively
+- name: squid pkng fix
+  lineinfile:
+    dest: /usr/local/etc/squid/squid.conf
+    backup: yes
+    line: 'refresh_pattern -i pkg.freebsd.org\/.*\/All\/.*(\.txz) 1440 100% 1051200 ignore-private ignore-must-revalidate override-expire ignore-no-cache'
+  notify: squid_restart
+
+# match against meta-information - this shouldn't be cached quite so aggressively
+- name: squid pkng fix
+  lineinfile:
+    dest: /usr/local/etc/squid/squid.conf
+    backup: yes
+    line: 'refresh_pattern -i pkg.freebsd.org\/.*\/.*(\.txz) 1440 100% 1051200 ignore-private ignore-must-revalidate override-expire ignore-no-cache'
+  notify: squid_restart
+
+- name: ensure cachedir
+  file: path="{{squid_cachedir}}" state=directory owner=squid group=squid mode=0750
+
+- name: initialize squid cachedir
+  command: squid -z creates="{{squid_cachedir}}/00"
+  when: squid_cachedir is defined
+
+- name: ensure squid service
+  service: name=squid enabled=yes state=started

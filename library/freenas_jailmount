@@ -1,0 +1,93 @@
+# this file is part of provnas
+# Copyright (c) 2015, Keve Mueller
+# All rights reserved.
+# see LICENSE for details
+
+#!/usr/bin/python
+
+import requests
+import datetime
+import json
+import collections
+import atexit
+from ansible import utils
+
+logf=open('x.log','w+')
+
+
+def _getJailsMountPoints(apiSession, apiBase):
+    jailsMPResponse = apiSession.get(apiBase + "/jails/mountpoints/")
+    jailsMP = jailsMPResponse.json();
+    return jailsMP
+
+#we match based on jail and destination only
+def _doStateAbsent(apiSession, apiBase, result, name, destination):
+    jailsMP = _getJailsMountPoints(apiSession, apiBase)
+    for jailMP in jailsMP:
+      if jailMP['jail'] == name and jailMP['destination'] == destination:
+         print >> logf, jailMP
+  	 deleteResponse = apiSession.delete("{}/jails/mountpoints/{:d}/".format(apiBase,jailMP['id']))
+         print >> logf, deleteResponse
+	 result['changed']=True
+         return False
+    result['changed']=False
+    return False
+
+def _doStatePresent(apiSession, apiBase, result, moduleParams):
+    jailsMP = _getJailsMountPoints(apiSession, apiBase)
+    for jailMP in jailsMP:
+      if jailMP['jail'] == moduleParams['name'] and jailMP['destination'] == moduleParams['destination']:
+	# TODO: ensure the other parameters are set (update)
+	result['changed']=False
+        return False
+    jailMPCreate = { 'jail': moduleParams['name'], 'source': moduleParams['source'], 'destination': moduleParams['destination'], 'mounted': True, 'readonly': moduleParams['readonly'], 'create': moduleParams['create'], 'mounted': moduleParams['mounted']}
+    mpResponse = apiSession.post(apiBase + "/jails/mountpoints/", data=json.dumps(jailMPCreate), headers={'Content-Type': 'application/json'})
+    print >> logf, mpResponse
+    print >> logf, mpResponse.json()
+    result['changed']=True
+    return False
+
+
+def main():
+    module = AnsibleModule(
+       argument_spec = dict(
+          host=dict(default='localhost', type='str'),
+          user=dict(default='root', type='str'),
+          password=dict(required=True, type='str'),
+          name=dict(required=True, type='str'),
+          state=dict(default='present', type='str'),
+	  source=dict(required=True, type='str'),
+          destination=dict(required=True, type='str'),
+	  create=dict(required=False, type='bool'),
+	  readonly=dict(required=False, type='bool'),
+	  mounted=dict(default=True, type='bool'),
+       )
+    )
+    result={}
+    failed=False
+
+    print >> logf, module.params
+
+    apiBase="http://" + module.params['host'] + '/api/v1.0';
+    apiSession = requests.Session()
+    apiSession.auth=(module.params['user'], module.params['password'])
+    
+    if module.params['state'] == 'absent':
+        failed = _doStateAbsent(apiSession, apiBase, result, module.params['name'], module.params['destination'])
+    elif module.params['state'] == 'present':
+        failed = _doStatePresent(apiSession, apiBase, result, module.params)
+    else:
+        result['msg'] = "Unknown state: " + module.params['state']
+        failed = True
+        
+    logf.close()
+    if failed:
+        module.fail_json(**result)
+    else:
+        module.exit_json(**result)
+
+from ansible.module_utils.basic import *
+main()
+
+
+# ex: set tabstop=4 softtabstop=4 shiftwidth=4 smarttab expandtab :

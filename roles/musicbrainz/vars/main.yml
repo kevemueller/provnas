@@ -1,0 +1,28 @@
+# this file is part of provnas
+# Copyright (c) 2015, Keve Mueller
+# All rights reserved.
+# see LICENSE for details
+
+
+mb_dest: /usr/local/musicbrainz
+
+mbdump_minimal:
+  - SHA256SUMS
+  - mbdump.tar.bz2
+  - mbdump-editor.tar.bz2
+  - mbdump-derived.tar.bz2
+
+mbdump_full:
+  - SHA256SUMS
+  - mbdump.tar.bz2
+  - mbdump-editor.tar.bz2
+  - mbdump-derived.tar.bz2
+  - mbdump-cdstubs.tar.bz2
+  - mbdump-cover-art-archive.tar.bz2
+  - mbdump-documentation.tar.bz2
+  - mbdump-edit.tar.bz2
+  - mbdump-stats.tar.bz2
+  - mbdump-wikidocs.tar.bz2
+# sitemaps will not import 
+#    - mbdump-sitemaps.tar.bz2
+

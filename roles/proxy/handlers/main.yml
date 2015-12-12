@@ -1,0 +1,7 @@
+# this file is part of provnas
+# Copyright (c) 2015, Keve Mueller
+# All rights reserved.
+# see LICENSE for details
+
+- name: squid_restart
+  service: name=squid state=restarted

@@ -1,0 +1,142 @@
+# this file is part of provnas
+# Copyright (c) 2015, Keve Mueller
+# All rights reserved.
+# see LICENSE for details
+
+#!/usr/bin/python
+
+import requests
+import datetime
+import json
+import collections
+import atexit
+from ansible import utils
+
+logf=open('x.log','w+')
+
+def _getJails(apiSession, apiBase):
+    jailsResponse = apiSession.get(apiBase + "/jails/jails/")
+    jails = jailsResponse.json();
+    return jails
+
+def _doStateAbsent(apiSession, apiBase, result, name):
+    jails = _getJails(apiSession, apiBase)
+    for jail in jails:
+      if jail['jail_host'] == name:
+         print >> logf, jail
+  	 deleteResponse = apiSession.delete("{}/jails/jails/{:d}/".format(apiBase,jail['id']))
+         print >> logf, deleteResponse
+	 result['changed']=True
+         return False
+    result['changed']=False
+    return False
+
+def _doStatePresent(apiSession, apiBase, result, moduleParams):
+    jails = _getJails(apiSession, apiBase)
+    for jail in jails:
+      if jail['jail_host'] == moduleParams['name']:
+         # go through the passed configuration and emit changes
+         config = {}
+ 	 for configKey, configValue in moduleParams['configuration'].iteritems():
+	    if jail[configKey] != configValue:
+	      config[configKey]=configValue
+         if (config):
+	    # this API call is not (yet) implemented
+            print >> logf, config
+	    updateResponse = apiSession.post("{}/jails/jails/{:d}/".format(apiBase, jail['id']), data=json.dumps(config), headers={'Content-Type': 'application/json'})
+            print >> logf, updateResponse
+            print >> logf, updateResponse.json()
+	 result['jail']=jail
+	 result['changed']=False
+         return False
+
+    jailCreate = { 'jail_host': moduleParams['name'], 'jail_type': '', 'jail_ipv4': 'DHCP' }
+    jailResponse = apiSession.post(apiBase + "/jails/jails/", data=json.dumps(jailCreate), headers={'Content-Type': 'application/json'})
+    print >> logf, jailResponse
+    jail = jailResponse.json();
+    print >> logf, jail
+    result['jail']=jail
+    result['changed']=True
+    return False
+
+def _getJail(jails, name):
+    for jail in jails:
+      if jail['jail_host'] == name:
+         return jail
+
+def _doStateStarted(apiSession, apiBase, result, moduleParams):
+    jails = _getJails(apiSession, apiBase)
+    jail = _getJail(jails, moduleParams['name'])
+    print >> logf, jail
+    if 'Running' == jail['jail_status']:
+      result['changed']=False
+      return False
+    jailStartResponse = apiSession.post("{}/jails/jails/{:d}/start/".format(apiBase, jail['id']))
+    print >> logf, jailStartResponse
+    result['changed']=True
+    return False
+
+def _doStateStopped(apiSession, apiBase, result, moduleParams):
+    jails = _getJails(apiSession, apiBase)
+    jail = _getJail(jails, moduleParams['name'])
+    print >> logf, jail
+    if 'Stopped' == jail['jail_status']:
+      result['changed']=False
+      return False
+    jailStopResponse = apiSession.post("{}/jails/jails/{:d}/stop/".format(apiBase, jail['id']))
+    print >> logf, jailStopResponse
+    result['changed']=True
+    return False
+
+def _doStateRestarted(apiSession, apiBase, result, moduleParams):
+    jails = _getJails(apiSession, apiBase)
+    jail = _getJail(jails, moduleParams['name'])
+    print >> logf, jail
+    jailRestartResponse = apiSession.post("{}/jails/jails/{:d}/restart/".format(apiBase, jail['id']))
+    print >> logf, jailRestartResponse
+    result['changed']=True
+    return False
+
+def main():
+    module = AnsibleModule(
+       argument_spec = dict(
+          host=dict(default='localhost', type='str'),
+          user=dict(default='root', type='str'),
+          password=dict(required=True, type='str'),
+          name=dict(required=True, type='str'),
+          state=dict(default='present', type='str'),
+          configuration=dict(default={}, type='dict'),
+       )
+    )
+    result={}
+    failed=False
+
+    apiBase="http://" + module.params['host'] + '/api/v1.0';
+    apiSession = requests.Session()
+    apiSession.auth=(module.params['user'], module.params['password'])
+    
+    if module.params['state'] == 'absent':
+        failed = _doStateAbsent(apiSession, apiBase, result, module.params['name'])
+    elif module.params['state'] == 'present':
+        failed = _doStatePresent(apiSession, apiBase, result, module.params)
+    elif module.params['state'] == 'started':
+        failed = _doStateStarted(apiSession, apiBase, result, module.params)
+    elif module.params['state'] == 'stopped':
+        failed = _doStateStopped(apiSession, apiBase, result, module.params)
+    elif module.params['state'] == 'restarted':
+        failed = _doStateRestarted(apiSession, apiBase, result, module.params)
+    else:
+        result['msg'] = "Unknown state: " + module.params['state']
+        failed = True
+        
+    logf.close()
+    if failed:
+        module.fail_json(**result)
+    else:
+        module.exit_json(**result)
+
+from ansible.module_utils.basic import *
+main()
+
+
+# ex: set tabstop=4 softtabstop=4 shiftwidth=4 smarttab expandtab :

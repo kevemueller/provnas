@@ -1,0 +1,19 @@
+# this file is part of provnas
+# Copyright (c) 2015, Keve Mueller
+# All rights reserved.
+# see LICENSE for details
+
+#- name: dumpall
+#  template: src=dumpallvars.j2 dest=/tmp/dumpall.out
+#  delegate_to: localhost
+
+- include: jail.yml
+
+- ping:
+  ignore_errors: yes
+  register: jp
+
+- raw: env ASSUME_ALWAYS_YES=YES pkg install python
+  when: jp|failed
+
+- setup:

@@ -1,0 +1,35 @@
+# this file is part of provnas
+# Copyright (c) 2015, Keve Mueller
+# All rights reserved.
+# see LICENSE for details
+
+# playbook to test jail module
+# use with -l to limit for a set of jails you don't care about
+- hosts: all
+  gather_facts: no
+  tasks: 
+    - freenas_jail:
+        state: stopped
+        name: "{{inventory_hostname}}"
+        password: "{{freenas_password}}"
+      delegate_to: "{{freenas_host}}"
+    - freenas_jail:
+        state: started
+        name: "{{inventory_hostname}}"
+        password: "{{freenas_password}}"
+      delegate_to: "{{freenas_host}}"
+    - freenas_jail:
+        state: restarted
+        name: "{{inventory_hostname}}"
+        password: "{{freenas_password}}"
+      delegate_to: "{{freenas_host}}"
+    - name: attrib
+      freenas_jail:
+        state: present
+        name: "{{inventory_hostname}}"
+        password: "{{freenas_password}}"
+        configuration: 
+          jail_flags: "allow.raw_sockets=true"
+      delegate_to: "{{freenas_host}}"
+      register: jail
+    - debug: var=jail

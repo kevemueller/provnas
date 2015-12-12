@@ -1,0 +1,13 @@
+# this file is part of provnas
+# Copyright (c) 2015, Keve Mueller
+# All rights reserved.
+# see LICENSE for details
+
+
+# ansible host inventory
+
+[jails]
+musicbrainz_1
+musicbrainz_2
+proxy_1
+headphones_1

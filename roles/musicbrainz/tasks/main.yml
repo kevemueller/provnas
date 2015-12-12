@@ -1,0 +1,148 @@
+# this file is part of provnas
+# Copyright (c) 2015, Keve Mueller
+# All rights reserved.
+# see LICENSE for details
+
+
+- name: ansible dependencies
+  pkgng: name={{item}} state=present
+  with_items:
+    - py27-httplib2
+
+# pull in 29 bsd packages
+- name: musicbrainz dependencies
+  pkgng: name={{item}} state=present
+  with_items:
+    - perl5
+    - postgresql94-server
+    - postgresql94-plperl
+    - postgresql94-contrib
+    - git
+    - memcached
+    - redis
+    - node
+    - npm
+    - icu
+    - p5-App-cpanminus
+    - p5-JSON-XS
+    - gmake
+
+- name: musicbrainz incompatible
+  pkgng: name={{item}} state=absent
+  with_items:
+    - perl5.18
+
+# TODO: move to jail config
+- name: pgsql config
+  command: sudo jail -m -n {{ inventory_hostname }} allow.sysvipc=1
+  delegate_to: localhost
+
+#TODO: manually fetch github host key
+
+- name: checkout musicbrainz server
+  git: repo=https://github.com/metabrainz/musicbrainz-server.git dest={{mb_dest}} recursive=yes accept_hostkey=true
+  register: musicbrainz_server_git
+
+# pull in 401 perl modules
+- name: perl dependencies
+  command: chdir={{mb_dest}} cpanm --installdeps --notest . 
+  when: musicbrainz_server_git.changed
+
+# pull in X node.js modules
+- name: node.js dependencies
+  command: chdir={{mb_dest}} npm install --no-shrinkwrap
+  when: musicbrainz_server_git.changed
+
+- name: gulp
+  command: chdir={{mb_dest}} node_modules/.bin/gulp
+  when: musicbrainz_server_git.changed
+
+#DBDefs
+- name: create DBDefs
+  command: creates={{mb_dest}}/lib/DBDefs.pm cp {{mb_dest}}/lib/DBDefs.pm.sample {{mb_dest}}/lib/DBDefs.pm
+
+- name: DBdefs
+  lineinfile: regexp="{{item.re}}" line='{{item.line}}' dest={{mb_dest}}/lib/DBDefs.pm
+  with_items:
+    - { re: "^sub WEB_SERVER.*$", line: "sub WEB_SERVER { \"{{ inventory_hostname }} \" }" }
+    - { re: "^(# )?sub REPLICATION_TYPE.*$", line: 'sub REPLICATION_TYPE { RT_SLAVE }' }
+    - { re: "^(# )?sub REPLICATION_ACCESS_TOKEN.*$", line: "sub REPLICATION_ACCESS_TOKEN { "{{mb_access_token|default('')" }" }
+    - { re: "^(# )?sub DB_STAGING_SERVER.*$", line: 'sub DB_STAGING_SERVER { 0 }' }
+    - { re: "^(# )?sub CATALYST_DEBUG.*$", line: 'sub CATALYST_DEBUG { 0 }' }
+
+- name: postgres root user
+  lineinfile: 
+    #insertafter: ' *database *=> *"template1",'
+    regexp: ' *username *=> *"postgres", *' 
+    line: 'username => "pgsql",'
+    dest: "{{mb_dest}}/lib/DBDefs.pm"
+    backrefs: yes
+
+# psql extensions
+- name: make pgsql unaccent
+  command: gmake install
+  args:
+    chdir: "{{mb_dest}}/postgresql-musicbrainz-unaccent"
+    creates: /usr/local/lib/postgresql/musicbrainz_unaccent.so
+
+- name: make pgsql collate
+  command: gmake install
+  args:
+    chdir: "{{mb_dest}}/postgresql-musicbrainz-collate"
+    creates: /usr/local/lib/postgresql/musicbrainz_collate.so
+
+
+- name: data owner
+  file: path=/usr/local/pgsql/data state=directory mode=0750 owner=pgsql group=pgsql
+
+- name: initdb
+  command: service postgresql oneinitdb
+  args:
+    creates: /usr/local/pgsql/data/PG_VERSION
+
+- name: ensure services running
+  service: name={{item}} state=started enabled=yes
+  with_items:
+    - postgresql
+    - memcached
+    - redis
+
+# does not work with proxy
+#- name: fetch mblatest
+#  uri: url=http://ftp.musicbrainz.org/pub/musicbrainz/data/fullexport/LATEST return_content=yes
+#  register: mblatest
+#  when: mblatest is not defined
+
+- name: fetch mblatest
+  get_url: url=http://ftp.musicbrainz.org/pub/musicbrainz/data/fullexport/LATEST dest=/tmp/mb.LATEST
+  when: mblatest is not defined
+  delegate_to: localhost
+
+- set_fact: mblatest={{lookup('file', '/tmp/mb.LATEST')}}
+  when: mblatest is not defined
+  delegate_to: localhost
+
+#TODO: if db exists and is more than 2w lagging behind mblatest, then remove the db
+#- name: remove existing db
+#  command: su pgsql -c "dropdb --if-exists musicbrainz_db"
+
+- name: check db
+  command: psql -U musicbrainz musicbrainz_db -c "SELECT * FROM artist LIMIT 1"
+  register: mb_dbcheck
+  ignore_errors: True
+
+- debug: var=mb_dbcheck
+
+#- name: clean db
+#  command: chdir={{mb_dest}} admin/InitDb.pl --createdb --clean
+
+- include: importdb.yml
+  when: mb_dbcheck|failed
+
+- name: template service launcher
+  template: dest=/usr/local/etc/rc.d/musicbrainz src=musicbrainz.j2 mode=0555
+
+- name: musicbrainz service
+  service: name=musicbrainz state=started enabled=yes
+
+# vim: tabstop=2 shiftwidth=2 expandtab

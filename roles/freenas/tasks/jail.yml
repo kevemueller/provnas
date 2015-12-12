@@ -1,0 +1,39 @@
+# this file is part of provnas
+# Copyright (c) 2015, Keve Mueller
+# All rights reserved.
+# see LICENSE for details
+
+- name: drop jail
+  freenas_jail: password={{freenas_password}} name={{inventory_hostname}} state=absent
+  delegate_to: localhost
+  when: "{{recycle_jail|default(False)}}"
+
+# FIXME: zfs module does not allow recursive delete
+- name: drop mountpoints
+  zfs:
+    name: "{{item.src}}"
+    state: absent
+  with_items: jail_mounts
+  delegate_to: localhost
+  when: "jail_mounts is defined and {{recycle_datastore|default(False)}}"
+
+- name: ensure jail
+  freenas_jail: password={{freenas_password}} name={{inventory_hostname}} state=present
+  delegate_to: localhost
+
+- name: create mountpoints
+  zfs: 
+    name: "{{item.src}}"
+    state: present
+    compression: "{{item.compression|default(omit)}}"
+    recordsize: "{{item.recordsize|default(omit)}}"
+    logbias: "{{item.logbias|default(omit)}}"
+  with_items: jail_mounts
+  delegate_to: localhost
+  when: jail_mounts is defined
+
+- name: jail mount
+  freenas_jailmount: password={{freenas_password}} name={{inventory_hostname}} source="/mnt/{{item.src}}" destination={{item.dst}} readonly=False create=True
+  with_items: jail_mounts
+  delegate_to: localhost
+  when: jail_mounts is defined

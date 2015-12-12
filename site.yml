@@ -1,0 +1,21 @@
+# this file is part of provnas
+# Copyright (c) 2015, Keve Mueller
+# All rights reserved.
+# see LICENSE for details
+
+
+# playbook for the whole site
+
+- hosts: jails
+  gather_facts: false
+  roles:
+    - freenas
+
+- hosts: proxy*
+  roles:
+     - proxy
+
+- hosts: musicbrainz*
+  roles:
+    - musicbrainz
+  environment: proxy_env
