@@ -11,12 +11,14 @@ Modules use freenas API
   * create, destroy, start, stop, restart jails
 * freenas_mountpoint 
   * create, delete mountpoint assignments of a jail
+
 ### Roles
 * musicbrainz
   * setup a musicbrainz server
   * download, configure, download dump, import dump
 * proxy
   * setup and configure squid
+
 ## Installation
 
 ## Usage
